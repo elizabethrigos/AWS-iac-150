@@ -27,4 +27,4 @@ jobs:
         aws cloudformation wait stack-delete-complete \
           --stack-name MiPrimerStackConGITHUB
         
-        echo "Stack deleted successfully!"
+        echo "Stack deleted successfully!"

@@ -24,4 +24,12 @@ jobs:
       run: |
         aws cloudformation deploy \
           --template-file template.yml \
-          --stack-name MiPrimerStackConGITHUB \
+          --stack-name MiPrimerStackConGITHUB \ 
+    
+    - name: Deploy EC2
+      run: aws cloudformation deploy --template-file templates/ec2.yml --stack-name MinTicEC2Stack
+
+    - name: Deploy S3
+      run: aws cloudformation deploy --template-file templates/s3.yml --stack-name MinTicS3
+
+    
