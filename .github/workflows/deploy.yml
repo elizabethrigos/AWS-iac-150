@@ -30,14 +30,20 @@ jobs:
           --no-fail-on-empty-changeset
 
     - name: Deploy S3
-      run: aws cloudformation deploy --template-file templates/s3.yml --stack-name MinTicS3
+      run: |
+        aws cloudformation deploy \
+          --template-file templates/s3.yml \
+          --stack-name MinTicS3 \
+          --no-fail-on-empty-changeset
 
     - name: Deploy EC2 Web (S3 App)
       run: |
         aws cloudformation deploy \
           --template-file templates/ec2-web.yml \
           --stack-name MinTicEC2WebStack \
-          --capabilities CAPABILITY_IAM
+          --capabilities CAPABILITY_IAM \
+          --parameter-overrides MinticKeyName=ssh-iac-mintic-ec2 \
+          --no-fail-on-empty-changeset
         
         echo "Obteniendo IP pública de la instancia..."
         aws cloudformation describe-stacks \
