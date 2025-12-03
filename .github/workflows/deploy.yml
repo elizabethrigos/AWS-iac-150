@@ -20,13 +20,24 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
+    - name: Cleanup ROLLBACK_COMPLETE stacks
+      run: |
+        for STACK_NAME in MiPrimerStackConGITHUB MinTicS3 MinTicEC2WebStack; do
+          STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
+          if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Deleting $STACK_NAME in ROLLBACK_COMPLETE state..."
+            aws cloudformation delete-stack --stack-name $STACK_NAME
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+            echo "$STACK_NAME deleted successfully!"
+          fi
+        done
+
     - name: MinTic Deploy CloudFormation stack
       run: |
         aws cloudformation deploy \
           --template-file template.yml \
           --stack-name MiPrimerStackConGITHUB \
           --capabilities CAPABILITY_IAM \
-          --parameter-overrides MinticKeyName=ssh-iac-mintic-ec2 \
           --no-fail-on-empty-changeset
 
     - name: Deploy S3
@@ -42,7 +53,6 @@ jobs:
           --template-file templates/ec2-web.yml \
           --stack-name MinTicEC2WebStack \
           --capabilities CAPABILITY_IAM \
-          --parameter-overrides MinticKeyName=ssh-iac-mintic-ec2 \
           --no-fail-on-empty-changeset
         
         echo "Obteniendo IP pública de la instancia..."
