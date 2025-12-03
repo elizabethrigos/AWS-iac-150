@@ -4,11 +4,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Instancias EC2 estaticas en 2 Zonas de Disponibilidad
 
 Parameters:
-  MinticKeyName:
-    Description: Nombre del par de claves SSH
-    Type: AWS::EC2::KeyPair::KeyName
-    Default: ssh-iac-mintic-ec2
-
   MinticAmiId:
     Description: AMI para las instancias EC2
     Type: String
@@ -54,7 +49,6 @@ Resources:
     Properties:
       ImageId: !Ref MinticAmiId
       InstanceType: t2.micro
-      KeyName: !Ref MinticKeyName
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
           SubnetId: !Ref SubnetId1
@@ -81,7 +75,6 @@ Resources:
     Properties:
       ImageId: !Ref MinticAmiId
       InstanceType: t2.micro
-      KeyName: !Ref MinticKeyName
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
           SubnetId: !Ref SubnetId2

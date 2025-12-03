@@ -3,11 +3,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: EC2 Instance que despliega una aplicacion web desde S3 (compatible con VPC)
 
 Parameters:
-  MinticKeyName:
-    Description: Nombre del par de claves SSH
-    Type: AWS::EC2::KeyPair::KeyName
-    Default: ssh-iac-mintic-ec2
-
   MinticAmiId:
     Description: AMI para las instancias EC2
     Type: String
@@ -105,7 +100,6 @@ Resources:
     Properties:
       ImageId: !Ref MinticAmiId
       InstanceType: t2.micro
-      KeyName: !Ref MinticKeyName
       IamInstanceProfile: !Ref EC2InstanceProfile
       NetworkInterfaces: !If
         - UseSubnet

@@ -4,11 +4,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Auto Scaling Group con Launch Template, Warm Pool y Scheduled Actions
 
 Parameters:
-  MinticKeyName:
-    Description: Nombre del par de claves SSH
-    Type: AWS::EC2::KeyPair::KeyName
-    Default: ssh-iac-mintic-ec2
-
   MinticAmiId:
     Description: AMI para las instancias EC2
     Type: String
@@ -44,7 +39,6 @@ Resources:
       LaunchTemplateData:
         ImageId: !Ref MinticAmiId
         InstanceType: t2.micro
-        KeyName: !Ref MinticKeyName
         SecurityGroupIds:
           - !Ref SecurityGroupId
         UserData:
