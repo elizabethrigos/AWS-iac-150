@@ -24,7 +24,10 @@ jobs:
       run: |
         aws cloudformation deploy \
           --template-file template.yml \
-          --stack-name MiPrimerStackConGITHUB
+          --stack-name MiPrimerStackConGITHUB \
+          --capabilities CAPABILITY_IAM \
+          --parameter-overrides MinticKeyName=ssh-iac-mintic-ec2 \
+          --no-fail-on-empty-changeset
 
     - name: Deploy S3
       run: aws cloudformation deploy --template-file templates/s3.yml --stack-name MinTicS3
