@@ -1,7 +1,5 @@
----
-# Template separado para EC2 estaticas (puede usarse de forma independiente)
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Instancias EC2 estaticas en 2 Zonas de Disponibilidad
+Description: Instancias EC2 estáticas en dos AZ con UserData
 
 Parameters:
   MinticAmiId:
@@ -9,41 +7,9 @@ Parameters:
     Type: String
     Default: ami-0f88e80871fd81e91
 
-  VPCId:
-    Description: ID de la VPC donde se crearan las instancias
-    Type: AWS::EC2::VPC::Id
-
-  SubnetId1:
-    Description: ID de la Subnet para la instancia en AZ1
-    Type: AWS::EC2::Subnet::Id
-
-  SubnetId2:
-    Description: ID de la Subnet para la instancia en AZ2
-    Type: AWS::EC2::Subnet::Id
-
 Resources:
-  # Grupo de seguridad para las instancias EC2
-  EC2SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Acceso HTTP y SSH desde cualquier lugar
-      VpcId: !Ref VPCId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-          Description: Permitir trafico HTTP
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-          Description: Permitir acceso SSH
-      Tags:
-        - Key: Name
-          Value: MinTic EC2 Security Group
 
-  # Instancia EC2 estatica en AZ1
+  # Instancia EC2 estática en AZ1 con UserData
   MinticEC2AZ1:
     Type: AWS::EC2::Instance
     Properties:
@@ -51,10 +17,11 @@ Resources:
       InstanceType: t2.micro
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
-          SubnetId: !Ref SubnetId1
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic1
           DeviceIndex: 0
           GroupSet:
-            - !Ref EC2SecurityGroup
+            - Fn::ImportValue: Mintic-SecurityGroupId
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -63,13 +30,8 @@ Resources:
           systemctl start httpd
           systemctl enable httpd
           echo "<html><body><h1>Hola desde EC2 AZ1 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
-      Tags:
-        - Key: Name
-          Value: MinticEC2-AZ1
-        - Key: Environment
-          Value: Production
 
-  # Instancia EC2 estatica en AZ2
+  # Instancia EC2 estática en AZ2 con UserData
   MinticEC2AZ2:
     Type: AWS::EC2::Instance
     Properties:
@@ -77,10 +39,11 @@ Resources:
       InstanceType: t2.micro
       NetworkInterfaces:
         - AssociatePublicIpAddress: true
-          SubnetId: !Ref SubnetId2
+          SubnetId:
+            Fn::ImportValue: Mintic-SubnetPublic2
           DeviceIndex: 0
           GroupSet:
-            - !Ref EC2SecurityGroup
+            - Fn::ImportValue: Mintic-SecurityGroupId
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -89,37 +52,12 @@ Resources:
           systemctl start httpd
           systemctl enable httpd
           echo "<html><body><h1>Hola desde EC2 AZ2 - IP: $(hostname -f)</h1></body></html>" > /var/www/html/index.html
-      Tags:
-        - Key: Name
-          Value: MinticEC2-AZ2
-        - Key: Environment
-          Value: Production
 
 Outputs:
-  EC2AZ1InstanceId:
-    Description: ID de la instancia EC2 en AZ1
-    Value: !Ref MinticEC2AZ1
-
-  EC2AZ2InstanceId:
-    Description: ID de la instancia EC2 en AZ2
-    Value: !Ref MinticEC2AZ2
-
-  EC2AZ1PublicIP:
-    Description: IP publica de la instancia EC2 en AZ1
+  MinticEC2AZ1PublicIP:
+    Description: IP pública de la instancia EC2 en AZ1
     Value: !GetAtt MinticEC2AZ1.PublicIp
 
-  EC2AZ2PublicIP:
-    Description: IP publica de la instancia EC2 en AZ2
+  MinticEC2AZ2PublicIP:
+    Description: IP pública de la instancia EC2 en AZ2
     Value: !GetAtt MinticEC2AZ2.PublicIp
-
-  EC2AZ1URL:
-    Description: URL de la instancia EC2 en AZ1
-    Value: !Sub http://${MinticEC2AZ1.PublicIp}
-
-  EC2AZ2URL:
-    Description: URL de la instancia EC2 en AZ2
-    Value: !Sub http://${MinticEC2AZ2.PublicIp}
-
-  SecurityGroupId:
-    Description: ID del Security Group
-    Value: !Ref EC2SecurityGroup

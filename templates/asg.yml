@@ -1,33 +1,5 @@
----
-# Template separado para Auto Scaling Group (puede usarse de forma independiente)
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Auto Scaling Group con Launch Template, Warm Pool y Scheduled Actions
-
-Parameters:
-  MinticAmiId:
-    Description: AMI para las instancias EC2
-    Type: String
-    Default: ami-0f88e80871fd81e91
-
-  VPCId:
-    Description: ID de la VPC donde se creara el ASG
-    Type: AWS::EC2::VPC::Id
-
-  SubnetIds:
-    Description: Lista de Subnets para el ASG
-    Type: List<AWS::EC2::Subnet::Id>
-
-  SecurityGroupId:
-    Description: ID del Security Group para las instancias
-    Type: AWS::EC2::SecurityGroup::Id
-
-  TargetGroupArn:
-    Description: ARN del Target Group del ALB (opcional)
-    Type: String
-    Default: ""
-
-Conditions:
-  HasTargetGroup: !Not [!Equals [!Ref TargetGroupArn, ""]]
+Description: Plantilla para Auto Scaling Group (ASG) con Launch Template y warm pool para Mintic
 
 Resources:
 
@@ -35,12 +7,11 @@ Resources:
   MinticLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
-      LaunchTemplateName: MinticASGLaunchTemplate
       LaunchTemplateData:
-        ImageId: !Ref MinticAmiId
+        ImageId: ami-0f88e80871fd81e91  # Puedes parametrizar si quieres
         InstanceType: t2.micro
         SecurityGroupIds:
-          - !Ref SecurityGroupId
+          - !ImportValue Mintic-SecurityGroupId  # Importa el SG exportado desde Security Stack
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
@@ -48,100 +19,57 @@ Resources:
             yum install -y httpd
             systemctl start httpd
             systemctl enable httpd
-            
-            # Obtener metadata de la instancia
-            TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-            INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
-            AZ=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-            
-            echo "<html><body>" > /var/www/html/index.html
-            echo "<h1>Hola desde CloudFormation ASG!</h1>" >> /var/www/html/index.html
-            echo "<p>Instancia: $INSTANCE_ID</p>" >> /var/www/html/index.html
-            echo "<p>Zona de Disponibilidad: $AZ</p>" >> /var/www/html/index.html
-            echo "</body></html>" >> /var/www/html/index.html
-        TagSpecifications:
-          - ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: MinticASG-Instance
-              - Key: Environment
-                Value: Production
-              - Key: ManagedBy
-                Value: CloudFormation
+            echo "<html><body><h1>¡Hola desde CloudFormation ASG - IP: $(hostname -f)!</h1></body></html>" > /var/www/html/index.html
 
   # Auto Scaling Group con 4 instancias distribuidas en 2 AZ
   MinticASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AutoScalingGroupName: MinticAutoScalingGroup
-      VPCZoneIdentifier: !Ref SubnetIds
+      VPCZoneIdentifier:
+        - !ImportValue Mintic-SubnetPublic1   # Importa desde VPC stack
+        - !ImportValue Mintic-SubnetPublic2
       LaunchTemplate:
         LaunchTemplateId: !Ref MinticLaunchTemplate
         Version: !GetAtt MinticLaunchTemplate.LatestVersionNumber
       MinSize: '4'
-      MaxSize: '6'
+      MaxSize: '4'
       DesiredCapacity: '4'
-      TargetGroupARNs: !If
-        - HasTargetGroup
-        - - !Ref TargetGroupArn
-        - !Ref AWS::NoValue
-      HealthCheckType: EC2
-      HealthCheckGracePeriod: 300
-      Tags:
-        - Key: Name
-          Value: MinticASG-Instance
-          PropagateAtLaunch: true
-        - Key: Environment
-          Value: Production
-          PropagateAtLaunch: true
+      TargetGroupARNs:
+        - !ImportValue MinticTargetGroupArn    # Importa desde ALB stack
 
   # Apaga todas las instancias del ASG a las 8:00 AM hora Colombia (13:00 UTC)
   MinticASGStopSchedule:
     Type: AWS::AutoScaling::ScheduledAction
     Properties:
       AutoScalingGroupName: !Ref MinticASG
-      DesiredCapacity: 0
       MinSize: 0
-      Recurrence: "0 13 * * *"
+      MaxSize: 0    
+      DesiredCapacity: 0
+      Recurrence: "0 13 * * *"   # 8:00 AM Colombia
 
   # Enciende todas las instancias del ASG a las 8:15 AM hora Colombia (13:15 UTC)
   MinticASGStartSchedule:
     Type: AWS::AutoScaling::ScheduledAction
     Properties:
       AutoScalingGroupName: !Ref MinticASG
-      DesiredCapacity: 4
       MinSize: 4
-      Recurrence: "15 13 * * *"
+      MaxSize: 4      
+      DesiredCapacity: 4
+      Recurrence: "15 13 * * *"  # 8:15 AM Colombia
 
   # Warm pool para mantener 2 instancias "listas" pero detenidas
   MinticWarmPool:
     Type: AWS::AutoScaling::WarmPool
     Properties:
       AutoScalingGroupName: !Ref MinticASG
-      PoolState: Stopped
-      MinSize: 2
-      MaxGroupPreparedCapacity: 4
-
-  # Politica de escalado basada en CPU
-  MinticScaleUpPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties:
-      AutoScalingGroupName: !Ref MinticASG
-      PolicyType: TargetTrackingScaling
-      TargetTrackingConfiguration:
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ASGAverageCPUUtilization
-        TargetValue: 70.0
+      PoolState: Stopped  # Las instancias estarán en estado detenido
+      MinSize: 2          # Mantiene 2 instancias en el warm pool
 
 Outputs:
-  ASGName:
-    Description: Nombre del Auto Scaling Group
+
+  # ID del Auto Scaling Group
+  MinticASGId:
+    Description: ID del Auto Scaling Group
     Value: !Ref MinticASG
-
-  LaunchTemplateId:
-    Description: ID del Launch Template
-    Value: !Ref MinticLaunchTemplate
-
-  LaunchTemplateVersion:
-    Description: Version del Launch Template
-    Value: !GetAtt MinticLaunchTemplate.LatestVersionNumber
+    Export:
+      Name: MinticASGId
